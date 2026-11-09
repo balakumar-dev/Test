@@ -5,7 +5,7 @@ namespace Test.Models.Signal
 {
     /// <summary>
     /// Full JSON payload sent to the browser on each 30-second poll.
-    /// Extends the chart data with bias, state-machine info, markers, and the active signal.
+    /// Extends the chart data with bias, state-machine info, markers, the active signal, and expiry info.
     /// </summary>
     public class SignalDataViewModel
     {
@@ -42,6 +42,15 @@ namespace Test.Models.Signal
 
         [JsonPropertyName("candles")]
         public List<CandleViewModel> Candles { get; set; } = new();
+
+        // ── Expiry info ───────────────────────────────────────────────────────
+        /// <summary>Groww symbol expiry code, e.g. "26N12".</summary>
+        [JsonPropertyName("expiry")]
+        public string Expiry { get; set; } = string.Empty;
+
+        /// <summary>Human-readable expiry date, e.g. "12-Nov-2026".</summary>
+        [JsonPropertyName("expiryDate")]
+        public string ExpiryDate { get; set; } = string.Empty;
 
         // ── Signal engine data ────────────────────────────────────────────────
 

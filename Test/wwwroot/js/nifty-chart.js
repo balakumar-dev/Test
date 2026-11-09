@@ -142,7 +142,6 @@ function initOptionChart() {
         handleScale:  { mouseWheel: true, pinch: true }
     });
 
-    // Matching visual style with left chart
     optCandleSeries = optChart.addCandlestickSeries({
         upColor:         COLOR_UP,
         downColor:       COLOR_DOWN,
@@ -250,6 +249,7 @@ function updateStatsBar(data) {
     setText('statCDH',      fmt(data.currentDayHigh));
     setText('statCDL',      fmt(data.currentDayLow));
     setText('statPrevDate', data.previousTradingDate || '—');
+    setText('statExpiry',   data.expiryDate || data.expiry || '—');
     setText('statSignals',  `${data.signalsToday} / ${data.maxSignalsPerDay}`);
 }
 
@@ -322,6 +322,10 @@ async function refreshOptionChart(signalData) {
     const ph = document.getElementById('optChartPlaceholder');
     const ct = document.getElementById('optChartContainer');
 
+    // Update expiry badge in right chart header
+    const expiryText = signalData?.expiryDate ? `Expiry: ${signalData.expiryDate}` : (signalData?.expiry ? `Expiry: ${signalData.expiry}` : '');
+    setText('optChartExpiry', expiryText);
+
     if (!optSym) {
         if (ph) ph.style.display = 'flex';
         if (ct) ct.style.display = 'none';
@@ -361,7 +365,7 @@ async function refreshOptionChart(signalData) {
         const json = await resp.json();
         if (!json.success || !json.candles?.length) return;
 
-        // Map to candlestick data using actual option OHLC
+        // Map to candlestick data using option OHLC
         const candleData = json.candles
             .filter(c => c.time && c.close > 0)
             .map(c => ({
@@ -393,23 +397,18 @@ async function refreshOptionChart(signalData) {
         }
 
         // ── SL line (red solid) — option HIGH at sweep-candle time ─────────────
-        // Trails downward as trade moves in our favour, locking in profit.
         if (trade?.slPremium > 0) {
-            const slLineStyle = trade.status === TRADE_STATUS_SL
-                ? LightweightCharts.LineStyle.Solid
-                : LightweightCharts.LineStyle.Solid;
             const slOpts = {
                 price:            trade.slPremium,
                 color:            '#ef5350',
                 lineWidth:        2,
-                lineStyle:        slLineStyle,
+                lineStyle:        LightweightCharts.LineStyle.Solid,
                 axisLabelVisible: true,
                 title:            `SL ${fmt(trade.slPremium)}`
             };
             if (optSlLine) optSlLine.applyOptions(slOpts);
             else           optSlLine = optCandleSeries.createPriceLine(slOpts);
         } else if (optSlLine) {
-            // SL premium not set — remove any existing SL line
             try { optCandleSeries.removePriceLine(optSlLine); } catch (_) {}
             optSlLine = null;
         }
@@ -484,27 +483,24 @@ function updateOptTradeStrip(trade, niftyPrice) {
         }
     }
 
-    // SL badges — two layers
+    // SL badges
     const slEl = document.getElementById('optSL');
     if (slEl) {
-        // Primary NIFTY index SL
         const niftySLText = trade.stopLossLevel > 0
             ? (trade.signalType === 'Buy'
                 ? `NIFTY SL: ${fmt(trade.stopLossLevel)} (sweep)`
                 : `NIFTY SL: ${fmt(trade.stopLossLevel)} (confirm)`)
             : '';
 
-        // Option premium SL (red line on chart, with trailing)
         const premSLText = trade.slPremium > 0
             ? `  |  Premium SL: ₹${fmt(trade.slPremium)}${trade.initialSlPremium > 0 && trade.slPremium < trade.initialSlPremium ? ' 📉' : ''}`
             : '';
 
         slEl.textContent = niftySLText + premSLText;
 
-        // Colour based on proximity to option premium SL (more relevant than index SL)
         if (trade.status === TRADE_STATUS_ACTIVE) {
             if (trade.slPremium > 0 && trade.currentPremium > 0) {
-                const premDist = trade.slPremium - trade.currentPremium; // > 0 means safe
+                const premDist = trade.slPremium - trade.currentPremium;
                 slEl.className = premDist <= 5
                     ? 'opt-sl-badge opt-sl-danger'
                     : premDist <= 20

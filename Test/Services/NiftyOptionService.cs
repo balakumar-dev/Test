@@ -15,12 +15,17 @@ namespace Test.Services
     /// Payload  : ["NIFTY26O1922850CE", "NIFTY26O1922850PE", ...]
     ///
     /// Symbols are generated dynamically: NIFTY + Expiry + Strike + CE/PE
-    /// e.g. Expiry="26O19", Strike=22850 → "NIFTY26O1922850CE"
+    /// e.g. Expiry="26N13", Strike=22850 → "NIFTY26N1322850CE"
+    ///
+    /// The expiry code is resolved each day from the Groww pro-option-chain API
+    /// via <see cref="IGrowwExpiryService"/>; it falls back to appsettings.json
+    /// (OptionChain:Expiry) if the API is unavailable.
     /// </summary>
     public class NiftyOptionService : INiftyOptionService
     {
-        private readonly IHttpClientFactory _httpFactory;
-        private readonly OptionChainOptions _opts;
+        private readonly IHttpClientFactory      _httpFactory;
+        private readonly OptionChainOptions      _opts;
+        private readonly IGrowwExpiryService     _expiryService;
         private readonly ILogger<NiftyOptionService> _logger;
 
         private static readonly TimeSpan IstOffset = TimeSpan.FromHours(5.5);
@@ -34,11 +39,13 @@ namespace Test.Services
         public NiftyOptionService(
             IHttpClientFactory httpFactory,
             IOptions<OptionChainOptions> opts,
+            IGrowwExpiryService expiryService,
             ILogger<NiftyOptionService> logger)
         {
-            _httpFactory = httpFactory;
-            _opts        = opts.Value;
-            _logger      = logger;
+            _httpFactory   = httpFactory;
+            _opts          = opts.Value;
+            _expiryService = expiryService;
+            _logger        = logger;
         }
 
         /// <inheritdoc/>
@@ -57,8 +64,10 @@ namespace Test.Services
                     .OrderBy(s => s)
                     .ToList();
 
+                // Resolve today's expiry dynamically from the Groww pro-option-chain API
+                var expiry = await _expiryService.GetCurrentExpiryAsync();
+
                 // Build symbol list
-                var expiry  = _opts.Expiry;
                 var symbols = strikes
                     .SelectMany(s => new[]
                     {

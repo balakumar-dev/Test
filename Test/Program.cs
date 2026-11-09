@@ -47,6 +47,12 @@ builder.Services.AddSingleton<IPaperTradingService, PaperTradingService>();
 // ── Option chain / option service options + service ───────────────────────────
 builder.Services.Configure<OptionChainOptions>(
     builder.Configuration.GetSection(OptionChainOptions.SectionName));
+
+// Singleton: fetches nearest weekly expiry from Groww pro-option-chain API once
+// per trading day, caches it in memory, and falls back to appsettings.json
+// → OptionChain:Expiry if the API is unavailable.
+builder.Services.AddSingleton<IGrowwExpiryService, GrowwExpiryService>();
+
 builder.Services.AddScoped<INiftyOptionService, NiftyOptionService>();
 
 // ── Build & Configure pipeline ───────────────────────────────────────────────
